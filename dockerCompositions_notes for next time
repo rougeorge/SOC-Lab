@@ -1,0 +1,87 @@
+#elk-vm
+
+azureadmin@elk-vm:~/elk$ cat ~/elk/docker-compose.yml
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+    mem_limit: 4g
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    mem_limit: 2g
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+volumes:
+  esdata:
+
+
+#the jump box
+
+azureadmin@jumpbox:~$ cat ~/ansible/Dockerfile            
+FROM python:3.12-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-client \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir ansible
+WORKDIR /ansible
+CMD ["bash"]
+
+
+Cloud CLI 
+george [ ~ ]$ az vm list -g $RG -d -o table
+Name     ResourceGroup    PowerState      PublicIps      Fqdns    Location
+-------  ---------------  --------------  -------------  -------  -----------
+elk-vm   soc-lab-rg       VM deallocated                          austriaeast
+jumpbox  soc-lab-rg       VM deallocated  68.210.101.27           austriaeast
+
+
+Resuming
+
+1. Set variables in Cloud Shell (they reset between sessions):
+
+RG=soc-lab-rg
+LOC=austriaeast
+MYIP=
+
+
+2.2. Check public IP. Look it up from your own computer. If it changed, update both rules, or SSH will hang:
+az network nsg rule update -g $RG --nsg-name mgmt-nsg \
+  --name Allow-SSH-MyIP --source-address-prefixes $MYIP
+az network nsg rule update -g $RG --nsg-name web-nsg \
+  --name Allow-HTTP-MyIP --source-address-prefixes $MYIP
+
+3. start VMs
+az vm start -g $RG -n jumpbox --no-wait
+az vm start -g $RG -n elk-vm --no-wait
+
+az vm list -g $RG -d -o table
+
+4. Connect
+ssh -i ~/.ssh/soc-lab-key azureadmin@68.210.101.27
+
+ssh -i ~/.ssh/ansible-key azureadmin@10.0.3.4
+cd ~/elk && docker compose ps
+
+
+5. Reopen Kibana 
+ssh -i ~/.ssh/soc-lab-key -L 5601:10.0.3.4:5601 azureadmin@68.210.101.27
+Browse to http://localhost:5601.
+
+6. Check the quota request. Before creating the web VMs, look at Quotas, Compute, Austria East in the portal. The web VMs are the next job once the limit is raised.
+
+

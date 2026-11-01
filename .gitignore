@@ -1,0 +1,10 @@
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+soc-lab-key*
+ansible-key*
+.env
+env.sh
+*.tfstate
+.DS_Store

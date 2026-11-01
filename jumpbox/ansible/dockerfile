@@ -1,0 +1,9 @@
+# Own Ansible image built from an official base, instead of a third-party image.
+# The container holds the key that reaches every other VM, so I only trust images I build.
+FROM python:3.12-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-client \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir ansible
+WORKDIR /ansible
+CMD ["bash"]
